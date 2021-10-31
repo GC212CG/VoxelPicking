@@ -1,6 +1,10 @@
 <!-- Licensed under a BSD license. See license.html for license -->
 <!DOCTYPE html>
 <html>
+  <button id = "Button0">정면도</button>
+  <button id = "Button1">좌측면도</button>
+  <button id = "Button2">평면도</button>
+  <button id = "Button3">입체도</button>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
@@ -353,14 +357,47 @@ function main() {
   const far = 1000;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
   camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
+  var per_view=1; //1 : perspective(default), 0 : orthographic
+	const ortho_cam = new THREE.OrthographicCamera(-cellSize,cellSize,cellSize/2,-cellSize/2,0.01, 1000 );
 
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
-  controls.update();
+
+  const ortho_controls = new OrbitControls(ortho_cam, canvas);
+  ortho_controls.target.set(0,0,0);
 
   const scene = new THREE.Scene();
 
-
+  document.getElementById("Button0").onclick = function(){ //정면도
+		ortho_cam.position.z = cellSize;
+		ortho_cam.position.x = cellSize/2;
+		ortho_cam.position.y = 0;
+    ortho_controls.target.set(cellSize/2,0,0);
+		per_view = 0 //orthographic
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button1").onclick = function(){ //좌측면도
+		ortho_cam.position.z = cellSize/2;
+		ortho_cam.position.x = -cellSize;
+		ortho_cam.position.y = 0;
+    ortho_controls.target.set(0,0,cellSize/2);
+		per_view = 0 //orthographic
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button2").onclick = function(){ //평면도
+		ortho_cam.position.z = cellSize/2;
+		ortho_cam.position.x = cellSize/2;
+		ortho_cam.position.y = cellSize;
+    ortho_controls.target.set(cellSize/2,0,cellSize/2);
+		per_view = 0 //orthographic
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button3").onclick = function(){ //입체도
+		camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
+    controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
+		per_view = 1 //perspective
+    requestRenderIfNotRequested();
+	};
   
   scene.background = new THREE.Color('lightblue');
 
@@ -481,15 +518,21 @@ function main() {
 
   function render() {
     renderRequested = undefined;
-
     if (resizeRendererToDisplaySize(renderer)) {
-      const canvas = renderer.domElement;
-      camera.aspect = canvas.clientWidth / canvas.clientHeight;
-      camera.updateProjectionMatrix();
-    }
-
-    controls.update();
-    renderer.render(scene, camera);
+        const canvas = renderer.domElement;
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+      }
+    if(per_view==1){
+			controls.update();
+			renderer.render( scene, camera ); //perspective
+		}
+		if(per_view==0){
+      ortho_controls.update();
+			renderer.render( scene, ortho_cam ); //orthographic
+		}
+    
+    
   }
   render();
 
@@ -533,23 +576,25 @@ function main() {
 
     const start = new THREE.Vector3();
     const end = new THREE.Vector3();
-    start.setFromMatrixPosition(camera.matrixWorld);
-    end.set(x, y, 1).unproject(camera);
-
-    const intersection = world.intersectRay(start, end);
-    if (intersection) {
-      const voxelId = event.shiftKey ? 0 : currentVoxel;
-      // the intersection point is on the face. That means
-      // the math imprecision could put us on either side of the face.
-      // so go half a normal into the voxel if removing (currentVoxel = 0)
-      // our out of the voxel if adding (currentVoxel  > 0)
-      const pos = intersection.position.map((v, ndx) => {
-        return v + intersection.normal[ndx] * (voxelId > 0 ? 0.5 : -0.5);
-      });
-      world.setVoxel(...pos, voxelId);
-      updateVoxelGeometry(...pos);
-      requestRenderIfNotRequested();
+    if(per_view==1){ //perspetive 카메라 시점일 때만 블럭 생성 및 제거 허용
+      start.setFromMatrixPosition(camera.matrixWorld);
+      end.set(x, y, 1).unproject(camera);
+      const intersection = world.intersectRay(start, end);
+      if (intersection) {
+        const voxelId = event.shiftKey ? 0 : currentVoxel;
+        // the intersection point is on the face. That means
+        // the math imprecision could put us on either side of the face.
+        // so go half a normal into the voxel if removing (currentVoxel = 0)
+        // our out of the voxel if adding (currentVoxel  > 0)
+        const pos = intersection.position.map((v, ndx) => {
+          return v + intersection.normal[ndx] * (voxelId > 0 ? 0.5 : -0.5);
+        });
+        world.setVoxel(...pos, voxelId);
+        updateVoxelGeometry(...pos);
+        requestRenderIfNotRequested();
+      }
     }
+    
   }
 
   const mouse = {
