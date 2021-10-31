@@ -1,10 +1,6 @@
 <!-- Licensed under a BSD license. See license.html for license -->
 <!DOCTYPE html>
 <html>
-  <button id = "Button0">정면도</button>
-  <button id = "Button1">좌측면도</button>
-  <button id = "Button2">평면도</button>
-  <button id = "Button3">입체도</button>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
@@ -78,8 +74,9 @@
 <script type="module">
 import * as THREE from './resources/threejs/r132/build/three.module.js';
 import {OrbitControls} from './resources/threejs/r132/examples/jsm/controls/OrbitControls.js';
-
-
+ 
+ 
+//복셀 데이터를 관리할 클래스
 class VoxelWorld {
   constructor(options) {
     this.cellSize = options.cellSize;
@@ -99,6 +96,8 @@ class VoxelWorld {
            voxelZ * cellSize +
            voxelX;
   }
+//cell의 위치값을 문자열로 지정
+//ex) 복셀(35,0,0)은 cell(1,0,0) -> cell id 는 “1,0,0”
   computeCellId(x, y, z) {
     const {cellSize} = this;
     const cellX = Math.floor(x / cellSize);
@@ -119,8 +118,11 @@ class VoxelWorld {
   getCellForVoxel(x, y, z) {
     return this.cells[this.computeCellId(x, y, z)];
   }
+ 
+// 복셀 데이터를 지정하는 메서드
   setVoxel(x, y, z, v, addCell = true) {
     let cell = this.getCellForVoxel(x, y, z);
+    // 존재하지 않는 cell의 복셀을 추가할 때 새로운 cell을 추가함
     if (!cell) {
       if (!addCell) {
         return;
@@ -130,6 +132,7 @@ class VoxelWorld {
     const voxelOffset = this.computeVoxelOffset(x, y, z);
     cell[voxelOffset] = v;
   }
+// 해당 위치의 복셀값을 반환하는 메서드 (이웃하는 복셀을 검사하기 위해 필요함)
   getVoxel(x, y, z) {
     const cell = this.getCellForVoxel(x, y, z);
     if (!cell) {
@@ -138,6 +141,7 @@ class VoxelWorld {
     const voxelOffset = this.computeVoxelOffset(x, y, z);
     return cell[voxelOffset];
   }
+// 각 cell의 geometry를 생성하는 메서드 (cell의 위치값을 인자로 받음)
   generateGeometryDataForCell(cellX, cellY, cellZ) {
     const {cellSize, tileSize, tileTextureWidth, tileTextureHeight} = this;
     const positions = [];
@@ -147,7 +151,7 @@ class VoxelWorld {
     const startX = cellX * cellSize;
     const startY = cellY * cellSize;
     const startZ = cellZ * cellSize;
-
+ 
     for (let y = 0; y < cellSize; ++y) {
       const voxelY = startY + y;
       for (let z = 0; z < cellSize; ++z) {
@@ -157,8 +161,11 @@ class VoxelWorld {
           const voxel = this.getVoxel(voxelX, voxelY, voxelZ);
           if (voxel) {
             // voxel 0 is sky (empty) so for UVs we start at 0
+            // 0 위치의 복셀은 하늘이므로 uv의 경우는 0에서 시작하도록 한다.
+ 
             const uvVoxel = voxel - 1;
             // There is a voxel here but do we need faces for it?
+            //현재 위치에 복셀이 있을때 해당 위치에 면이 필요한지 검사합니다.
             for (const {dir, corners, uvRow} of VoxelWorld.faces) {
               const neighbor = this.getVoxel(
                   voxelX + dir[0],
@@ -166,6 +173,7 @@ class VoxelWorld {
                   voxelZ + dir[2]);
               if (!neighbor) {
                 // this voxel has no neighbor in this direction so we need a face.
+                //(이 복셀은 이 방향에 이웃하는 복셀이 없으므로 이쪽 면에 면을 만든다)
                 const ndx = positions.length / 3;
                 for (const {pos, uv} of corners) {
                   positions.push(pos[0] + x, pos[1] + y, pos[2] + z);
@@ -184,7 +192,7 @@ class VoxelWorld {
         }
       }
     }
-
+ 
     return {
       positions,
       normals,
@@ -192,7 +200,7 @@ class VoxelWorld {
       indices,
     };
   }
-
+ 
     // from
     // http://www.cse.chalmers.se/edu/year/2010/course/TDA361/grid.pdf
     intersectRay(start, end) {
@@ -201,35 +209,35 @@ class VoxelWorld {
     let dz = end.z - start.z;
     const lenSq = dx * dx + dy * dy + dz * dz;
     const len = Math.sqrt(lenSq);
-
+ 
     dx /= len;
     dy /= len;
     dz /= len;
-
+ 
     let t = 0.0;
     let ix = Math.floor(start.x);
     let iy = Math.floor(start.y);
     let iz = Math.floor(start.z);
-
+ 
     const stepX = (dx > 0) ? 1 : -1;
     const stepY = (dy > 0) ? 1 : -1;
     const stepZ = (dz > 0) ? 1 : -1;
-
+ 
     const txDelta = Math.abs(1 / dx);
     const tyDelta = Math.abs(1 / dy);
     const tzDelta = Math.abs(1 / dz);
-
+ 
     const xDist = (stepX > 0) ? (ix + 1 - start.x) : (start.x - ix);
     const yDist = (stepY > 0) ? (iy + 1 - start.y) : (start.y - iy);
     const zDist = (stepZ > 0) ? (iz + 1 - start.z) : (start.z - iz);
-
+ 
     // location of nearest voxel boundary, in units of t
     let txMax = (txDelta < Infinity) ? txDelta * xDist : Infinity;
     let tyMax = (tyDelta < Infinity) ? tyDelta * yDist : Infinity;
     let tzMax = (tzDelta < Infinity) ? tzDelta * zDist : Infinity;
-
+ 
     let steppedIndex = -1;
-
+ 
     // main loop along raycast vector
     while (t <= len) {
       const voxel = this.getVoxel(ix, iy, iz);
@@ -248,7 +256,7 @@ class VoxelWorld {
           voxel,
         };
       }
-
+ 
       // advance t to next nearest voxel boundary
       if (txMax < tyMax) {
         if (txMax < tzMax) {
@@ -279,7 +287,7 @@ class VoxelWorld {
     return null;
   }
 }
-
+ 
 VoxelWorld.faces = [
   { // left
     uvRow: 0,
@@ -342,73 +350,42 @@ VoxelWorld.faces = [
     ],
   },
 ];
-
-
-
+ 
+ 
+ 
 function main() {
   const canvas = document.querySelector('#c');
   const renderer = new THREE.WebGLRenderer({canvas});
-
+ 
   const cellSize = 32;
-
+ 
   const fov = 75;
   const aspect = 2;  // the canvas default
   const near = 0.1;
   const far = 1000;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
   camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
-  var per_view=1; //1 : perspective(default), 0 : orthographic
-	const ortho_cam = new THREE.OrthographicCamera(-cellSize,cellSize,cellSize/2,-cellSize/2,0.01, 1000 );
-
+ 
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
-
-  const ortho_controls = new OrbitControls(ortho_cam, canvas);
-  ortho_controls.target.set(0,0,0);
-
+  controls.update();
+ 
   const scene = new THREE.Scene();
-
-  document.getElementById("Button0").onclick = function(){ //정면도
-		ortho_cam.position.z = cellSize;
-		ortho_cam.position.x = cellSize/2;
-		ortho_cam.position.y = 0;
-    ortho_controls.target.set(cellSize/2,0,0);
-		per_view = 0 //orthographic
-    requestRenderIfNotRequested();
-	};
-	document.getElementById("Button1").onclick = function(){ //좌측면도
-		ortho_cam.position.z = cellSize/2;
-		ortho_cam.position.x = -cellSize;
-		ortho_cam.position.y = 0;
-    ortho_controls.target.set(0,0,cellSize/2);
-		per_view = 0 //orthographic
-    requestRenderIfNotRequested();
-	};
-	document.getElementById("Button2").onclick = function(){ //평면도
-		ortho_cam.position.z = cellSize/2;
-		ortho_cam.position.x = cellSize/2;
-		ortho_cam.position.y = cellSize;
-    ortho_controls.target.set(cellSize/2,0,cellSize/2);
-		per_view = 0 //orthographic
-    requestRenderIfNotRequested();
-	};
-	document.getElementById("Button3").onclick = function(){ //입체도
-		camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
-    controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
-		per_view = 1 //perspective
-    requestRenderIfNotRequested();
-	};
-  
+ 
+ 
+ 
   scene.background = new THREE.Color('lightblue');
-
+ 
   const tileSize = 16;
   const tileTextureWidth = 256;
   const tileTextureHeight = 64;
+ 
+  //텍스처 불러오기 위해 필요한 코드
   const loader = new THREE.TextureLoader();
   const texture = loader.load('resources/images/minecraft/flourish-cc-by-nc-sa.png', render);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
-
+ 
   function addLight(x, y, z) {
     const color = 0xFFFFFF;
     const intensity = 1;
@@ -418,21 +395,22 @@ function main() {
   }
   addLight(-1,  2,  4);
   addLight( 1, -1, -2);
-
+ 
   const world = new VoxelWorld({
     cellSize,
     tileSize,
     tileTextureWidth,
     tileTextureHeight,
   });
-
+ 
+  //재질을 만들때 텍스처를 사용하도록 설정
   const material = new THREE.MeshLambertMaterial({
     map: texture,
     side: THREE.DoubleSide,
     alphaTest: 0.1,
     transparent: true,
   });
-
+ 
   const cellIdToMesh = {};
   function updateCellGeometry(x, y, z) {
     const cellX = Math.floor(x / cellSize);
@@ -440,8 +418,10 @@ function main() {
     const cellZ = Math.floor(z / cellSize);
     const cellId = world.computeCellId(x, y, z);
     let mesh = cellIdToMesh[cellId];
+ 
+    //geometry를 만들때 UV좌표를 사용하도록 설정
     const geometry = mesh ? mesh.geometry : new THREE.BufferGeometry();
-
+ 
     const {positions, normals, uvs, indices} = world.generateGeometryDataForCell(cellX, cellY, cellZ);
     const positionNumComponents = 3;
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), positionNumComponents));
@@ -451,7 +431,7 @@ function main() {
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), uvNumComponents));
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
-
+ 
     if (!mesh) {
       mesh = new THREE.Mesh(geometry, material);
       mesh.name = cellId;
@@ -460,7 +440,7 @@ function main() {
       mesh.position.set(cellX * cellSize, cellY * cellSize, cellZ * cellSize);
     }
   }
-
+ 
   const neighborOffsets = [
     [ 0,  0,  0], // self
     [-1,  0,  0], // left
@@ -483,73 +463,74 @@ function main() {
       }
     }
   }
-
+ 
+  //cell을 복셀로 채우는 코드 (1층짜리 판 만들기)
   for (let y = 0; y < cellSize; ++y) {
     for (let z = 0; z < cellSize; ++z) {
       for (let x = 0; x < cellSize; ++x) {
-       // const height = (Math.sin(x / cellSize * Math.PI * 2) + Math.sin(z / cellSize * Math.PI * 3)) * (cellSize / 6) + (cellSize / 2);
-        const height = 1
-
+               const height = 1
+ 
         if (y < height) {
+         //텍스처를 랜덤으로 선택해서 만들도록 설정
          world.setVoxel(x, y, z, randInt(1, 17));
         }
       }
     }
   }
-
+ 
   function randInt(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
   }
-
+ 
   updateVoxelGeometry(1, 1, 1);  // 0,0,0 will generate
-
+ 
+  //canvas의 원본 크기와 디스플레이 크기를 비교해 원본 크기를 변경할지 결정하는 함수
+  //디스플레이 크기 : css로 지정한 크기
   function resizeRendererToDisplaySize(renderer) {
     const canvas = renderer.domElement;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     const needResize = canvas.width !== width || canvas.height !== height;
+    //리사이징필요한지 검사 :canvas의 크기 다르면 renderer.setSize 메서드를 호출해 새로운 width와 height를 넘김
     if (needResize) {
-      renderer.setSize(width, height, false);
+      renderer.setSize(width, height, false); //마지막 인자로 false를 넘김.
     }
-    return needResize;
+    return needResize; //리사이징했으면 true를 반환
   }
-
+ 
   let renderRequested = false;
-
+ 
   function render() {
     renderRequested = undefined;
+ 
+    //카메라의 aspect(비율) 속성을 canvas의 화면의 크기에 맞춤.
     if (resizeRendererToDisplaySize(renderer)) {
-        const canvas = renderer.domElement;
-        camera.aspect = canvas.clientWidth / canvas.clientHeight;
-        camera.updateProjectionMatrix();
-      }
-    if(per_view==1){
-			controls.update();
-			renderer.render( scene, camera ); //perspective
-		}
-		if(per_view==0){
-      ortho_controls.update();
-			renderer.render( scene, ortho_cam ); //orthographic
-		}
-    
-    
+      const canvas = renderer.domElement;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    } //resizeRendererToDisplaySize함수가 true를 반환했을때만 카메라 비율 변경 -> 디스플레이 크기에 맞는 해상도로 렌더링
+ 
+    controls.update();
+    renderer.render(scene, camera);
   }
   render();
-
+ 
+  //렌더함수가 자동으로 불리지 않았을때, 렌더함수를 호출
   function requestRenderIfNotRequested() {
     if (!renderRequested) {
       renderRequested = true;
       requestAnimationFrame(render);
     }
   }
-
+ 
+  //사용자가 선택한 라디오 버튼을 해제할 수 있게 하는 코드
   let currentVoxel = 0;
   let currentId;
-
+ 
   document.querySelectorAll('#ui .tiles input[type=radio][name=voxel]').forEach((elem) => {
     elem.addEventListener('click', allowUncheck);
   });
-
+ 
   function allowUncheck() {
     if (this.id === currentId) {
       this.checked = false;
@@ -560,7 +541,8 @@ function main() {
       currentVoxel = parseInt(this.value);
     }
   }
-
+ 
+  // 사용자가 클릭한 지점에 복셀을 추가하는 함수
   function getCanvasRelativePosition(event) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -568,40 +550,40 @@ function main() {
       y: (event.clientY - rect.top ) * canvas.height / rect.height,
     };
   }
-
+ 
   function placeVoxel(event) {
     const pos = getCanvasRelativePosition(event);
     const x = (pos.x / canvas.width ) *  2 - 1;
     const y = (pos.y / canvas.height) * -2 + 1;  // note we flip Y
-
+ 
     const start = new THREE.Vector3();
     const end = new THREE.Vector3();
-    if(per_view==1){ //perspetive 카메라 시점일 때만 블럭 생성 및 제거 허용
-      start.setFromMatrixPosition(camera.matrixWorld);
-      end.set(x, y, 1).unproject(camera);
-      const intersection = world.intersectRay(start, end);
-      if (intersection) {
-        const voxelId = event.shiftKey ? 0 : currentVoxel;
-        // the intersection point is on the face. That means
-        // the math imprecision could put us on either side of the face.
-        // so go half a normal into the voxel if removing (currentVoxel = 0)
-        // our out of the voxel if adding (currentVoxel  > 0)
-        const pos = intersection.position.map((v, ndx) => {
-          return v + intersection.normal[ndx] * (voxelId > 0 ? 0.5 : -0.5);
-        });
-        world.setVoxel(...pos, voxelId);
-        updateVoxelGeometry(...pos);
-        requestRenderIfNotRequested();
-      }
+    start.setFromMatrixPosition(camera.matrixWorld);
+    end.set(x, y, 1).unproject(camera);
+ 
+    const intersection = world.intersectRay(start, end);
+    if (intersection) {
+      const voxelId = event.shiftKey ? 0 : currentVoxel;
+      // the intersection point is on the face. That means
+      // the math imprecision could put us on either side of the face.
+      // so go half a normal into the voxel if removing (currentVoxel = 0)
+      // our out of the voxel if adding (currentVoxel  > 0)
+      const pos = intersection.position.map((v, ndx) => {
+        return v + intersection.normal[ndx] * (voxelId > 0 ? 0.5 : -0.5);
+      });
+      //마우스를 클릭하면 setVoxel 함수를 통해 복셀을 추가함
+      //그다음 updateVoxelGeometry 함수를 호출해서 변경된 geometry를 반영함
+      world.setVoxel(...pos, voxelId);
+      updateVoxelGeometry(...pos);
+      requestRenderIfNotRequested();
     }
-    
   }
-
+ 
   const mouse = {
     x: 0,
     y: 0,
   };
-
+ 
   function recordStartPosition(event) {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
@@ -629,11 +611,16 @@ function main() {
     // prevent scrolling
     event.preventDefault();
   }, {passive: false});
-
+ 
+  //orbitControls가 카메라 설정을  바꿀때 마다 직접 reder함수를 호출해야함.
+  //-> orbitControls의 change이벤트 사용
   controls.addEventListener('change', requestRenderIfNotRequested);
+ 
+  //창크기가 바뀔때의 동작 직접 처리 -> rendeer함수 호출
   window.addEventListener('resize', requestRenderIfNotRequested);
 }
-
 main();
 </script>
 </html>
+ 
+
