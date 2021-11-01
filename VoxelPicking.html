@@ -1,6 +1,10 @@
 <!-- Licensed under a BSD license. See license.html for license -->
 <!DOCTYPE html>
 <html>
+  <button id = "Button0">정면도</button>
+  <button id = "Button1">좌측면도</button>
+  <button id = "Button2">평면도</button>
+  <button id = "Button3">입체도</button>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
@@ -365,14 +369,36 @@ function main() {
   const far = 1000;
   const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
   camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
- 
+
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
   controls.update();
+
+
+  var per_view=1;
  
   const scene = new THREE.Scene();
  
- 
+  document.getElementById("Button0").onclick = function(){ //정면도
+		camera.position.set(cellSize/2, 1, -cellSize);
+    controls.target.set(cellSize/2, 0, 0);
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button1").onclick = function(){ //좌측면도
+		camera.position.set(-cellSize, 1, cellSize/2);
+    controls.target.set(0, 0, cellSize/2);
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button2").onclick = function(){ //평면도
+		camera.position.set(cellSize/2, cellSize, cellSize/2-0.001); //-0.01을 지울시 정면의 반대를 기준으로 평면을 바라보고 있음
+    controls.target.set(cellSize/2, 0, cellSize/2);
+    requestRenderIfNotRequested();
+	};
+	document.getElementById("Button3").onclick = function(){ //입체도
+		camera.position.set(-cellSize * .3, cellSize * .8, -cellSize * .3);
+    controls.target.set(cellSize / 2, cellSize / 3, cellSize / 2);
+    requestRenderIfNotRequested();
+	};
  
   scene.background = new THREE.Color('lightblue');
  
@@ -502,15 +528,18 @@ function main() {
  
   function render() {
     renderRequested = undefined;
- 
     //카메라의 aspect(비율) 속성을 canvas의 화면의 크기에 맞춤.
     if (resizeRendererToDisplaySize(renderer)) {
       const canvas = renderer.domElement;
       camera.aspect = canvas.clientWidth / canvas.clientHeight;
       camera.updateProjectionMatrix();
+      
     } //resizeRendererToDisplaySize함수가 true를 반환했을때만 카메라 비율 변경 -> 디스플레이 크기에 맞는 해상도로 렌더링
- 
+
     controls.update();
+    if(camera.position.y<=1.1){
+      camera.position.y = 1.1;
+    }
     renderer.render(scene, camera);
   }
   render();
